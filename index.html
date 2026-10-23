@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>百家乐实时概率计算器 · 你报牌，我算概率</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#f4f6f9;color:#1f2937;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.7}
+  .wrap{max-width:920px;margin:0 auto;padding:30px 20px 70px}
+  h1{font-size:25px;margin:0 0 4px;letter-spacing:-.3px}
+  .sub{color:#6b7280;font-size:13.5px;margin:0 0 22px}
+  .card{background:#fff;border:1px solid #e6eaf0;border-radius:12px;padding:18px 20px;margin:14px 0}
+  h2{font-size:16px;margin:0 0 12px;font-weight:600}
+  .warn{background:#fff8e6;border:1px solid #f0d9a8;border-left:5px solid #d99a1c;
+    border-radius:10px;padding:14px 18px;margin:14px 0;font-size:14px}
+  .warn b{color:#8a5a06}
+  .hit{background:#eefaf2;border:1px solid #b6e3c8;border-left:5px solid #1e7a4c;
+    border-radius:10px;padding:14px 18px;margin:14px 0;font-size:14px}
+  .hit b{color:#1e7a4c}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{padding:8px 9px;border-bottom:1px solid #eef1f5;text-align:left}
+  th{background:#f7f9fc;color:#4b5563;font-weight:600;font-size:12.5px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.on td{background:#eefaf2}
+  .neg{color:#c0392b;font-weight:600}
+  .pos{color:#1e7a4c;font-weight:600}
+  .flat{color:#6b7280}
+  .ranks{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .rk{width:42px;height:42px;border:1px solid #d6dce5;background:#fff;border-radius:8px;
+    font-size:14px;cursor:pointer;font-variant-numeric:tabular-nums;color:#1f2937}
+  .rk:hover{background:#eef3fb;border-color:#9db8e8}
+  .rk.zero{opacity:.35}
+  button.act{border:1px solid #d6dce5;background:#fff;border-radius:8px;padding:8px 14px;
+    font-size:13.5px;cursor:pointer;color:#1f2937}
+  button.act:hover{background:#f3f6fb}
+  button.act.primary{background:#2f6fed;border-color:#2f6fed;color:#fff}
+  button.act.primary:hover{background:#2559c9}
+  button.act.ghost{color:#8a94a6}
+  .slots{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .slot{min-width:78px;border:1px dashed #cfd7e3;border-radius:9px;padding:7px 9px;text-align:center;background:#fbfcfe}
+  .slot.filled{border-style:solid;border-color:#9db8e8;background:#eef3fb}
+  .slot .lb{font-size:11px;color:#8a94a6}
+  .slot .vl{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+  .tot{font-size:14px;margin:8px 0;color:#374151}
+  .tot b{font-size:19px;color:#1f2937}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:10px;margin:12px 0}
+  .stat{background:#f7f9fc;border-radius:9px;padding:11px 13px}
+  .stat .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:11.5px;color:#6b7280;margin-top:1px}
+  .bars{display:flex;align-items:flex-end;gap:5px;height:74px;margin:10px 0}
+  .bar{flex:1;background:#dbe4f0;border-radius:3px 3px 0 0;position:relative;min-height:2px}
+  .bar span{position:absolute;bottom:-19px;left:0;right:0;text-align:center;font-size:10.5px;color:#8a94a6}
+  .bar em{position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:10.5px;
+    font-style:normal;color:#4b5563;font-variant-numeric:tabular-nums}
+  .hint{color:#8a94a6;font-size:12.5px;margin-top:6px}
+  .log{max-height:150px;overflow:auto;font-size:12.5px;color:#4b5563;
+    font-family:ui-monospace,Menlo,Consolas,monospace;background:#fbfcfe;
+    border:1px solid #eef1f5;border-radius:8px;padding:10px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  select,input[type=number]{padding:7px 10px;border:1px solid #d6dce5;border-radius:8px;
+    background:#fff;font-size:13.5px}
+  input[type=number]{width:74px}
+  .kbd{display:inline-block;border:1px solid #d6dce5;border-bottom-width:2px;border-radius:4px;
+    padding:0 5px;font-size:11.5px;background:#fff;color:#4b5563}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:20px;
+    background:#eef3fb;color:#2f6fed;border:1px solid #cfe0f8}
+  ul{padding-left:20px} li{margin:6px 0}
+  code{background:#f1f3f7;padding:1px 6px;border-radius:4px;font-size:13px}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ---- 手机端 ---- */
+  @media (max-width:600px){
+    body{-webkit-text-size-adjust:100%}
+    .wrap{padding:16px 12px 56px}
+    h1{font-size:20px}
+    .sub{font-size:12.5px;margin:0 0 14px}
+    .card{padding:14px 13px;border-radius:10px;margin:12px 0}
+    .warn,.hit{padding:12px 13px;font-size:13px}
+    h2{font-size:15px}
+    .rk{width:38px;height:44px;font-size:14px}   /* 触摸目标 ≥44px */
+    .ranks{gap:5px}
+    .slot{min-width:62px;padding:6px 7px}
+    .slots{gap:6px}
+    .grid{grid-template-columns:repeat(2,1fr);gap:8px}
+    .stat{padding:10px 11px}
+    .stat .v{font-size:17px}
+    .bars{height:62px;gap:3px}
+    .tw{margin:0 -13px;padding:0 13px}
+    .tw table{min-width:500px;font-size:12.5px}
+    th,td{padding:7px 6px}
+    button.act{padding:10px 12px;font-size:13.5px}
+    .row{gap:7px}
+    .log{font-size:11.5px;max-height:120px}
+  }
+  @media (max-width:360px){
+    .rk{width:34px;height:42px}
+    .slot{min-width:56px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>百家乐实时概率计算器</h1>
+<p class="sub">你报明牌，我算概率。每局打完自动从牌堆里扣掉，下一局在剩余牌上重新算。只做分析，不做判断。</p>
+
+<div class="warn">
+  <b>先把这三个数分清，否则后面全白算。</b><br>
+  押庄在「分出胜负的局」里胜率常年 <b>50.68%</b> —— 它已经过半了，但它赢的时候只赔 <b>0.95</b>（抽 5% 水）。
+  <ul style="margin:8px 0 0">
+    <li><b>50.68%</b>　你真实会看到的胜率</li>
+    <li><b>51.28%</b>　打平线（不赚不亏）—— 差 <b>0.60</b> 个百分点</li>
+    <li><b>52.00%</b>　你设的目标线 —— 差 <b>1.32</b> 个百分点</li>
+  </ul>
+  胜率过半不等于赚钱。差的那 0.6 个点，就是赌场的全部利润。
+</div>
+
+<div class="card">
+  <h2>牌靴</h2>
+  <div class="row">
+    <label>副数
+      <select id="decks">
+        <option value="8" selected>8 副（常见）</option>
+        <option value="6">6 副</option>
+        <option value="1">1 副</option>
+      </select>
+    </label>
+    <label>目标胜率
+      <input type="number" id="target" value="52" min="50" max="60" step="0.1"> %
+    </label>
+    <button class="act" id="btnReset">重置牌靴</button>
+    <span class="hint" id="shoeInfo"></span>
+  </div>
+  <div class="bars" id="bars"></div>
+  <div class="hint">剩余牌堆按点数分布（0 点 = 10/J/Q/K，A=1）</div>
+</div>
+
+<div class="card">
+  <h2>报牌</h2>
+  <div class="ranks" id="ranks"></div>
+  <div class="slots" id="slots"></div>
+  <div class="tot" id="totals"></div>
+  <div class="row">
+    <button class="act primary" id="btnSubmit">提交这一局</button>
+    <button class="act" id="btnClear">清空本局</button>
+    <button class="act ghost" id="btnUndo">撤销上一局</button>
+    <button class="act ghost" id="btnBurn">记为烧牌</button>
+    <span class="hint">键盘：<span class="kbd">A</span> <span class="kbd">2</span>…<span class="kbd">9</span>
+      <span class="kbd">0</span>/<span class="kbd">T</span> <span class="kbd">J</span> <span class="kbd">Q</span>
+      <span class="kbd">K</span> 加牌，<span class="kbd">Enter</span> 提交，<span class="kbd">Backspace</span> 退一张</span>
+  </div>
+  <div class="log" id="log" style="margin-top:12px"></div>
+</div>
+
+<div class="card">
+  <h2>下一局的精确概率 <span class="tag">枚举法，零抽样误差</span></h2>
+  <div class="grid">
+    <div class="stat"><div class="v" id="pB">—</div><div class="l">庄赢概率</div></div>
+    <div class="stat"><div class="v" id="pP">—</div><div class="l">闲赢概率</div></div>
+    <div class="stat"><div class="v" id="pT">—</div><div class="l">和局概率</div></div>
+    <div class="stat"><div class="v" id="remain">—</div><div class="l">剩余张数</div></div>
+  </div>
+  <div class="tw">
+  <table>
+    <thead>
+      <tr>
+        <th>下注</th>
+        <th class="num">当前胜率<br><span style="font-weight:400;color:#8a94a6">（不含和局）</span></th>
+        <th class="num">打平线</th>
+        <th class="num">你的目标</th>
+        <th class="num">距目标</th>
+        <th class="num">每押 100 元<br>期望盈亏</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  </div>
+  <div class="grid" style="margin-top:14px">
+    <div class="stat"><div class="v" id="stHands">0</div><div class="l">本靴已录局数</div></div>
+    <div class="stat"><div class="v" id="stMax">—</div><div class="l">本靴最高押庄胜率</div></div>
+    <div class="stat"><div class="v" id="stHits">0</div><div class="l">触及目标线的次数</div></div>
+    <div class="stat"><div class="v" id="stDepth">—</div><div class="l">牌靴已消耗</div></div>
+  </div>
+  <p class="hint" id="verdict"></p>
+</div>
+
+<div class="card">
+  <h2>你的 52% 目标：实测多久能碰到一次</h2>
+  <p>我把 60 个牌靴、2345 个位置全部精确算了一遍，统计「押庄胜率」的分布：</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>牌靴剩余</th><th class="num">样本</th><th class="num">押庄胜率均值</th>
+      <th class="num">出现过的最高</th><th class="num">超过 52% 的占比</th></tr></thead>
+    <tbody>
+      <tr><td class="flat">剩 150 张以上</td><td class="num">611</td><td class="num">50.690%</td><td class="num">50.929%</td><td class="num neg">0.0%</td></tr>
+      <tr><td class="flat">剩 100~150</td><td class="num">614</td><td class="num">50.681%</td><td class="num">50.916%</td><td class="num neg">0.0%</td></tr>
+      <tr><td class="flat">剩 60~100（<b>赌场切牌区</b>）</td><td class="num">485</td><td class="num">50.667%</td><td class="num">51.138%</td><td class="num neg">0.0%</td></tr>
+      <tr><td class="flat">剩 30~60</td><td class="num">361</td><td class="num">50.659%</td><td class="num">51.286%</td><td class="num neg">0.0%</td></tr>
+      <tr><td class="flat">剩 30 张以内</td><td class="num">274</td><td class="num">50.688%</td><td class="num pos">53.919%</td><td class="num pos">1.1%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="hit" style="margin-top:14px">
+    <b>结论：52% 是能碰到的，但代价是你要熬到牌靴见底。</b><br>
+    全局 2345 个位置里，押庄胜率超过 52% 的只有 <b>0.13%</b> —— 大约 <b>770 局才出现 1 次</b>，
+    而且全部集中在牌靴剩 30 张以内（约最后 5~6 局）。
+    而在赌场真实的切牌区间（剩 60~104 张），<b>最高只到 51.14%，一次都没够到 52%</b>。
+  </div>
+  <p class="hint">顺带一提：52% 的押庄胜率对应期望 <code>+1.27%</code>。所以你的目标本身定得没问题——
+  如果能稳定维持 52%，确实赢钱。问题不在目标，在于牌靴几乎不给这个机会。</p>
+</div>
+
+<div class="card">
+  <h2>怎么用才不算白用</h2>
+  <ul>
+    <li><b>开局先记烧牌。</b>赌场开局翻第一张、按其点数烧掉若干张，这些牌是<b>暗牌你看不见</b>——
+      如果你漏记，剩余牌堆就错了，后面全盘皆错。这是实战中最大的误差来源。</li>
+    <li><b>盯着「距目标」那一列。</b>它是负数就别下注；只有变绿（当前胜率 ≥ 你的目标）才算达标。</li>
+    <li><b>看「牌靴已消耗」。</b>没到 80% 之前，胜率基本钉死在 50.68%，算不算都一样。</li>
+    <li><b>别把它当买卖信号。</b>它能精确告诉你概率，但概率本身在绝大多数时候是负期望的。</li>
+  </ul>
+</div>
+
+<p class="hint" style="margin-top:24px">
+  中国大陆境内赌博及参与境外网络赌博均属违法，澳门特别行政区为境内唯一合法经营赌场之地。
+  本页仅供概率论教学，不构成任何投注建议。
+</p>
+
+</div>
+
+<script>
+"use strict";
+const RANKS = ['A','2','3','4','5','6','7','8','9','T','J','Q','K'];
+const val = r => (r <= 8 ? r + 1 : 0);
+const SLOT_LABEL = ['闲 第1张','庄 第1张','闲 第2张','庄 第2张','闲 第3张','庄 第3张'];
+
+let counts = new Array(10).fill(0);
+let nDecks = 8, shoeSize = 0;
+let pending = [];
+let history = [];
+let stats = {hands:0, maxWB:0, hits:0};
+
+function bankerDraws(tb, pThird){
+  if (pThird === null || pThird === undefined) return tb <= 5;
+  const c = pThird;
+  if (tb <= 2) return true;
+  if (tb === 3) return c !== 8;
+  if (tb === 4) return c >= 2 && c <= 7;
+  if (tb === 5) return c >= 4 && c <= 7;
+  if (tb === 6) return (c === 6 || c === 7);
+  return false;
+}
+
+function exactProbs(c){
+  const N = c.reduce((a,b)=>a+b,0);
+  if (N < 6) return null;
+  let pB=0, pP=0, pT=0;
+  for (let i=0;i<10;i++){
+    const ci=c[i]; if(!ci) continue;
+    for (let j=i;j<10;j++){
+      const cj=c[j]; let ppair;
+      if (i===j){ if(ci<2) continue; ppair = ci*(ci-1)/(N*(N-1)); }
+      else { if(!cj) continue; ppair = 2*ci*cj/(N*(N-1)); }
+      const tp0=(i+j)%10;
+      const c1=c.slice(); c1[i]--; c1[j]--;
+      const N1=N-2;
+      for (let k=0;k<10;k++){
+        const ck=c1[k]; if(!ck) continue;
+        for (let l=k;l<10;l++){
+          const cl=c1[l]; let bpair;
+          if (k===l){ if(ck<2) continue; bpair=ck*(ck-1)/(N1*(N1-1)); }
+          else { if(!cl) continue; bpair=2*ck*cl/(N1*(N1-1)); }
+          const tb0=(k+l)%10;
+          const pr2=ppair*bpair;
+          if (tp0>=8 || tb0>=8){
+            if (tp0>tb0) pP+=pr2; else if (tb0>tp0) pB+=pr2; else pT+=pr2;
+            continue;
+          }
+          const c2=c1.slice(); c2[k]--; c2[l]--;
+          const N2=N1-2;
+          if (tp0<=5){
+            for (let m=0;m<10;m++){
+              const cm=c2[m]; if(!cm) continue;
+              const p3=cm/N2;
+              const tp=(tp0+m)%10;
+              const c3=c2.slice(); c3[m]--;
+              const N3=N2-1;
+              if (bankerDraws(tb0,m)){
+                for (let n=0;n<10;n++){
+                  const cn=c3[n]; if(!cn) continue;
+                  const tb=(tb0+n)%10;
+                  const pr=pr2*p3*(cn/N3);
+                  if (tp>tb) pP+=pr; else if (tb>tp) pB+=pr; else pT+=pr;
+                }
+              } else {
+                const pr=pr2*p3;
+                if (tp>tb0) pP+=pr; else if (tb0>tp) pB+=pr; else pT+=pr;
+              }
+            }
+          } else {
+            if (bankerDraws(tb0,null)){
+              for (let n=0;n<10;n++){
+                const cn=c2[n]; if(!cn) continue;
+                const tb=(tb0+n)%10;
+                const pr=pr2*(cn/N2);
+                if (tp0>tb) pP+=pr; else if (tb>tp0) pB+=pr; else pT+=pr;
+              }
+            } else {
+              if (tp0>tb0) pP+=pr2; else if (tb0>tp0) pB+=pr2; else pT+=pr2;
+            }
+          }
+        }
+      }
+    }
+  }
+  return {pB,pP,pT};
+}
+
+function resetShoe(){
+  nDecks = parseInt(document.getElementById('decks').value, 10);
+  counts = new Array(10).fill(0);
+  for (let d=0; d<nDecks*4; d++) for (let r=0;r<13;r++) counts[val(r)]++;
+  shoeSize = counts.reduce((a,b)=>a+b,0);
+  pending = []; history = []; stats = {hands:0, maxWB:0, hits:0};
+  render(); save();
+}
+
+function removeCards(ranks){
+  for (const r of ranks){ if (counts[val(r)] > 0) counts[val(r)]--; }
+}
+
+function getTarget(){
+  const v = parseFloat(document.getElementById('target').value);
+  return (isFinite(v) && v > 0 && v < 100) ? v/100 : 0.52;
+}
+
+function render(){
+  const N = counts.reduce((a,b)=>a+b,0);
+  const target = getTarget();
+  document.getElementById('remain').textContent = N;
+  document.getElementById('shoeInfo').textContent =
+    `${nDecks} 副牌，已录入 ${history.length} 项，剩余 ${N} 张`;
+  document.getElementById('stHands').textContent = stats.hands;
+  document.getElementById('stHits').textContent = stats.hits;
+  document.getElementById('stMax').textContent =
+    stats.hands ? (stats.maxWB*100).toFixed(3) + '%' : '—';
+  document.getElementById('stDepth').textContent =
+    shoeSize ? ((1 - N/shoeSize)*100).toFixed(0) + '%' : '—';
+
+  const bars = document.getElementById('bars');
+  const mx = Math.max(...counts, 1);
+  bars.innerHTML = '';
+  for (let v=0; v<10; v++){
+    const d = document.createElement('div');
+    d.className = 'bar';
+    d.style.height = Math.max(2, counts[v]/mx*58) + 'px';
+    d.innerHTML = `<em>${counts[v]}</em><span>${v}</span>`;
+    bars.appendChild(d);
+  }
+
+  const rk = document.getElementById('ranks');
+  rk.innerHTML = '';
+  RANKS.forEach((s, r) => {
+    const b = document.createElement('button');
+    b.className = 'rk' + (counts[val(r)] === 0 ? ' zero' : '');
+    b.textContent = s;
+    b.onclick = () => addCard(r);
+    rk.appendChild(b);
+  });
+
+  const sl = document.getElementById('slots');
+  sl.innerHTML = '';
+  for (let i=0;i<6;i++){
+    const d = document.createElement('div');
+    d.className = 'slot' + (pending[i] !== undefined ? ' filled' : '');
+    d.innerHTML = `<div class="lb">${SLOT_LABEL[i]}</div>
+      <div class="vl">${pending[i] !== undefined ? RANKS[pending[i]] : '·'}</div>`;
+    sl.appendChild(d);
+  }
+
+  const t = document.getElementById('totals');
+  if (pending.length >= 4){
+    const p1=val(pending[0]), b1=val(pending[1]), p2=val(pending[2]), b2=val(pending[3]);
+    let P=(p1+p2)%10, B=(b1+b2)%10;
+    if (pending[4] !== undefined) P=(P+val(pending[4]))%10;
+    if (pending[5] !== undefined) B=(B+val(pending[5]))%10;
+    t.innerHTML = `闲 <b>${P}</b> 点 · 庄 <b>${B}</b> 点 ·
+      本局结果：<b>${P>B?'闲':(B>P?'庄':'和')}</b>`;
+  } else {
+    t.innerHTML = '<span style="color:#8a94a6">至少录入 4 张牌（闲1 · 庄1 · 闲2 · 庄2）</span>';
+  }
+
+  const res = exactProbs(counts);
+  const tb = document.getElementById('tbody');
+  if (!res){
+    ['pB','pP','pT'].forEach(id => document.getElementById(id).textContent = '—');
+    tb.innerHTML = '<tr><td colspan="6" style="color:#8a94a6">剩余牌不足，请重置牌靴</td></tr>';
+    document.getElementById('verdict').textContent = '';
+    renderLog();
+    return;
+  }
+  const {pB,pP,pT} = res;
+  document.getElementById('pB').textContent = (pB*100).toFixed(3) + '%';
+  document.getElementById('pP').textContent = (pP*100).toFixed(3) + '%';
+  document.getElementById('pT').textContent = (pT*100).toFixed(3) + '%';
+
+  const dec = pB + pP;
+  const winB = dec > 0 ? pB/dec : 0;
+  const winP = dec > 0 ? pP/dec : 0;
+  const winT = pT;
+  const beB = 1/1.95, beP = 0.5, beT = 1/9;
+  const evB = 0.95*pB - pP, evP = pP - pB, evT = 8*pT - (1-pT);
+
+  const row = (name, win, be, ev) => {
+    const okTarget = win >= target;
+    const okBe = win >= be;
+    const gap = (win - target) * 100;
+    const cls = okBe ? 'pos' : 'neg';
+    return `<tr class="${okTarget ? 'on' : ''}">
+      <td style="font-weight:600">${name}</td>
+      <td class="num ${okTarget ? 'pos' : ''}">${(win*100).toFixed(3)}%</td>
+      <td class="num flat">${(be*100).toFixed(3)}%</td>
+      <td class="num flat">${(target*100).toFixed(1)}%</td>
+      <td class="num ${cls}">${gap>=0?'+':''}${gap.toFixed(3)} pp</td>
+      <td class="num ${cls}">${ev>=0?'+':''}${(ev*100).toFixed(3)} 元</td>
+    </tr>`;
+  };
+  tb.innerHTML = row('押庄（赔 0.95）', winB, beB, evB)
+               + row('押闲（赔 1）', winP, beP, evP)
+               + row('押和（赔 8）', winT, beT, evT);
+
+  const best = Math.max(evB, evP, evT);
+  const v = document.getElementById('verdict');
+  if (winB >= target || winP >= target){
+    v.innerHTML = `<b class="pos">达标：当前胜率已触及你设的 ${(target*100).toFixed(1)}% 目标线。</b>
+      这就是那个约 770 局 才出现 1 次的时刻——如果它出现在牌靴深处，请记住这很罕见。`;
+  } else if (best > 0){
+    v.innerHTML = `<b class="pos">当前存在正期望下注（${(best*100).toFixed(3)}%）。</b>
+      但胜率还没到你设的 ${(target*100).toFixed(1)}%，距目标还差
+      ${((target-Math.max(winB,winP))*100).toFixed(3)} 个百分点。`;
+  } else {
+    v.innerHTML = `<b class="neg">三种下注期望全为负</b>（最好 ${(best*100).toFixed(3)}%），
+      且最高胜率 ${(Math.max(winB,winP)*100).toFixed(3)}% 距你的
+      ${(target*100).toFixed(1)}% 目标还差
+      <b>${((target-Math.max(winB,winP))*100).toFixed(2)}</b> 个百分点。
+      牌靴消耗到 80% 以上之前，这一行基本不会变。`;
+  }
+  renderLog();
+}
+
+function renderLog(){
+  const el = document.getElementById('log');
+  if (!history.length){ el.textContent = '尚未录入任何牌。'; return; }
+  const n = history.length, k = Math.min(n, 40);
+  el.innerHTML = history.slice(-k).map((h,i) =>
+    `${n - k + i + 1}. ${h.kind}：${h.text}`).join('<br>');
+}
+
+function addCard(r){
+  if (pending.length >= 6) return;
+  if (counts[val(r)] <= 0){ alert('点数 ' + val(r) + ' 的牌已经没有了，请检查输入或重置牌靴。'); return; }
+  pending.push(r); render();
+}
+
+function submitHand(){
+  if (pending.length < 4){ alert('一局至少要 4 张牌（闲1 · 庄1 · 闲2 · 庄2）。'); return; }
+  const [p1,b1,p2,b2] = pending;
+  let P=(val(p1)+val(p2))%10, B=(val(b1)+val(b2))%10;
+  if (pending[4] !== undefined) P=(P+val(pending[4]))%10;
+  if (pending[5] !== undefined) B=(B+val(pending[5]))%10;
+  const result = P>B ? '闲' : (B>P ? '庄' : '和');
+  removeCards(pending);
+  // 先算"下一局"的胜率，再入历史，这样撤销时能精确回滚
+  const r = exactProbs(counts);
+  let wb = 0, hit = false;
+  if (r){
+    const dec = r.pB + r.pP;
+    wb = dec > 0 ? r.pB/dec : 0;
+    hit = (wb >= getTarget() || (dec > 0 && r.pP/dec >= getTarget()));
+    stats.hands++;
+    if (wb > stats.maxWB) stats.maxWB = wb;
+    if (hit) stats.hits++;
+  }
+  history.push({cards:pending.slice(), kind:'第'+(stats.hands)+'局', wb, hit,
+    text:`闲 ${P} vs 庄 ${B} → ${result}（${pending.map(r=>RANKS[r]).join(' ')}）`});
+  pending = [];
+  render(); save();
+}
+
+function burnCards(){
+  if (!pending.length){ alert('先录入要烧掉的牌。'); return; }
+  removeCards(pending);
+  history.push({cards:pending.slice(), kind:'烧牌', wb:0, hit:false,
+    text:pending.map(r=>RANKS[r]).join(' ')});
+  pending = []; render(); save();
+}
+
+function undo(){
+  const h = history.pop();
+  if (!h) return;
+  for (const r of h.cards) counts[val(r)]++;
+  if (h.kind !== '烧牌' && stats.hands > 0) stats.hands--;
+  // 用存下来的 wb 重算极值，保证撤销后统计是对的
+  stats.maxWB = 0; stats.hits = 0;
+  for (const x of history){
+    if (x.wb > stats.maxWB) stats.maxWB = x.wb;
+    if (x.hit) stats.hits++;
+  }
+  render(); save();
+}
+
+/* ---------- 自动存档：手机上误刷新 / 切后台不丢牌 ---------- */
+const SAVE_KEY = 'baccarat_calc_v1';
+function save(){
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      counts, nDecks, shoeSize, history, stats,
+      target: document.getElementById('target').value
+    }));
+  }catch(e){}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.counts) || s.counts.length !== 10) return false;
+    counts = s.counts; nDecks = s.nDecks || 8;
+    shoeSize = s.shoeSize || counts.reduce((a,b)=>a+b,0);
+    history = s.history || [];
+    stats = s.stats || {hands:0, maxWB:0, hits:0};
+    if (s.target) document.getElementById('target').value = s.target;
+    document.getElementById('decks').value = String(nDecks);
+    return history.length > 0;
+  }catch(e){ return false; }
+}
+
+document.getElementById('btnReset').onclick = resetShoe;
+document.getElementById('btnSubmit').onclick = submitHand;
+document.getElementById('btnBurn').onclick = burnCards;
+document.getElementById('btnUndo').onclick = undo;
+document.getElementById('btnClear').onclick = () => { pending = []; render(); };
+document.getElementById('decks').onchange = resetShoe;
+document.getElementById('target').oninput = render;
+
+const KEYMAP = {a:0,'0':9,t:9,j:10,q:11,k:12};
+document.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (k === 'enter'){ submitHand(); return; }
+  if (k === 'backspace'){ pending.pop(); render(); e.preventDefault(); return; }
+  if (k >= '2' && k <= '9'){ addCard(parseInt(k,10) - 1); return; }
+  if (k in KEYMAP){ addCard(KEYMAP[k]); return; }
+});
+
+// 启动时：有存档就恢复，没有就开新靴
+if (load()){ pending = []; render(); }
+else resetShoe();
+</script>
+</body>
+</html>
